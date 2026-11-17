@@ -282,4 +282,12 @@ interface IDisplayManager {
     // Set the display topology
     @EnforcePermission("MANAGE_DISPLAYS")
     void setDisplayTopology(in DisplayTopology topology);
+
+    // Concept 006 Stage B: compositor viewport shrink for OLED one-handed mode
+    @EnforcePermission("WRITE_SECURE_SETTINGS")
+    void setOneHandedViewport(int displayId, float scale, int gravity);
+
+    float getOneHandedViewportScale(int displayId);
+
+    int getOneHandedViewportGravity(int displayId);
 }

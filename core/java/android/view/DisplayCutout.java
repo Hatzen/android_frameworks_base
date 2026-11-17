@@ -1343,7 +1343,8 @@ public final class DisplayCutout {
     }
 
     private static int getSideOverride(int[] sideOverrides, @Rotation int rotation) {
-        if (sideOverrides == null || sideOverrides.length != 4) {
+        if (sideOverrides == null || sideOverrides.length != 4
+                || rotation < 0 || rotation >= sideOverrides.length) {
             return INVALID_SIDE_OVERRIDE;
         }
         return sideOverrides[rotation];

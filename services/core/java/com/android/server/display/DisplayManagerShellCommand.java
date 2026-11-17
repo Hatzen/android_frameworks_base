@@ -134,6 +134,12 @@ class DisplayManagerShellCommand extends ShellCommand {
                 return getSupportedHdrOutputTypes();
             case "get-active-mode":
                 return getActiveMode();
+            case "set-one-handed":
+                return setOneHandedViewport();
+            case "reset-one-handed":
+                return resetOneHandedViewport();
+            case "get-one-handed":
+                return getOneHandedViewport();
             default:
                 return handleDefaultCommands(cmd);
         }
@@ -227,6 +233,12 @@ class DisplayManagerShellCommand extends ShellCommand {
         pw.println("    Sets brightness to docked + idle screen brightness mode");
         pw.println("  undock");
         pw.println("    Sets brightness to active (normal) screen brightness mode");
+        pw.println("  set-one-handed SCALE [bottom-right|bottom-left|center] [--id DISPLAY_ID]");
+        pw.println("    Scales internal display compositor viewport for OLED one-handed mode.");
+        pw.println("  reset-one-handed [--id DISPLAY_ID]");
+        pw.println("    Resets one-handed viewport scale to 1.0.");
+        pw.println("  get-one-handed [--id DISPLAY_ID]");
+        pw.println("    Prints current one-handed viewport scale and gravity.");
         pw.println("  enable-display DISPLAY_ID");
         pw.println("    Enable the DISPLAY_ID. Only possible if this is a connected display.");
         pw.println("  disable-display DISPLAY_ID");
@@ -510,6 +522,88 @@ class DisplayManagerShellCommand extends ShellCommand {
 
     private int resetBrightnessConfiguration() {
         mService.resetBrightnessConfigurations();
+        return 0;
+    }
+
+    private int parseOneHandedGravity(String value) {
+        return switch (value.toLowerCase(Locale.ROOT)) {
+            case "bottom-left", "left", "1" -> LogicalDisplay.ONE_HANDED_GRAVITY_BOTTOM_LEFT;
+            case "center", "2" -> LogicalDisplay.ONE_HANDED_GRAVITY_CENTER;
+            default -> LogicalDisplay.ONE_HANDED_GRAVITY_BOTTOM_RIGHT;
+        };
+    }
+
+    private int setOneHandedViewport() {
+        final String scaleText = getNextArg();
+        if (scaleText == null) {
+            getErrPrintWriter().println(
+                    "Error: usage: set-one-handed <scale 0.40..1.0> [bottom-right|bottom-left|center] [--id ID]");
+            return 1;
+        }
+        final float scale;
+        try {
+            scale = Float.parseFloat(scaleText);
+        } catch (NumberFormatException e) {
+            getErrPrintWriter().println("Error: invalid scale=" + scaleText);
+            return 1;
+        }
+        int gravity = LogicalDisplay.ONE_HANDED_GRAVITY_BOTTOM_RIGHT;
+        int displayId = Display.DEFAULT_DISPLAY;
+        String arg;
+        while ((arg = getNextArg()) != null) {
+            if ("--id".equals(arg)) {
+                final String idText = getNextArgRequired();
+                try {
+                    displayId = Integer.parseInt(idText);
+                } catch (NumberFormatException e) {
+                    getErrPrintWriter().println("Error: invalid displayId=" + idText);
+                    return 1;
+                }
+            } else {
+                gravity = parseOneHandedGravity(arg);
+            }
+        }
+        mService.setOneHandedViewportInternal(displayId, scale, gravity);
+        return 0;
+    }
+
+    private Integer parseDisplayIdArg(String arg) {
+        final String idText = getNextArgRequired();
+        try {
+            return Integer.parseInt(idText);
+        } catch (NumberFormatException e) {
+            getErrPrintWriter().println("Error: invalid displayId=" + idText);
+            return null;
+        }
+    }
+
+    private int resetOneHandedViewport() {
+        int displayId = Display.DEFAULT_DISPLAY;
+        String arg;
+        while ((arg = getNextArg()) != null) {
+            if ("--id".equals(arg)) {
+                final Integer parsed = parseDisplayIdArg(arg);
+                if (parsed == null) return 1;
+                displayId = parsed;
+            }
+        }
+        mService.setOneHandedViewportInternal(
+                displayId, 1.0f, LogicalDisplay.ONE_HANDED_GRAVITY_BOTTOM_RIGHT);
+        return 0;
+    }
+
+    private int getOneHandedViewport() {
+        int displayId = Display.DEFAULT_DISPLAY;
+        String arg;
+        while ((arg = getNextArg()) != null) {
+            if ("--id".equals(arg)) {
+                final Integer parsed = parseDisplayIdArg(arg);
+                if (parsed == null) return 1;
+                displayId = parsed;
+            }
+        }
+        getOutPrintWriter().println("scale=" + mService.getOneHandedViewportScaleInternal(displayId)
+                + " gravity=" + mService.getOneHandedViewportGravityInternal(displayId));
         return 0;
     }
 

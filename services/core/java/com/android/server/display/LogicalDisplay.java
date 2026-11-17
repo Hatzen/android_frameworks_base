@@ -135,9 +135,17 @@ final class LogicalDisplay {
     private DisplayModeDirector.DesiredDisplayModeSpecs mDesiredDisplayModeSpecs =
             new DisplayModeDirector.DesiredDisplayModeSpecs();
 
+    public static final int ONE_HANDED_GRAVITY_BOTTOM_RIGHT = 0;
+    public static final int ONE_HANDED_GRAVITY_BOTTOM_LEFT = 1;
+    public static final int ONE_HANDED_GRAVITY_CENTER = 2;
+
     // The display offsets to apply to the display projection.
     private int mDisplayOffsetX;
     private int mDisplayOffsetY;
+
+    // Concept 006 Stage B: compositor viewport shrink leaving unused OLED pixels black.
+    private volatile float mOneHandedScale = 1.0f;
+    private volatile int mOneHandedGravity = ONE_HANDED_GRAVITY_BOTTOM_RIGHT;
 
     /**
      * The position of the display projection sent to SurfaceFlinger
@@ -885,6 +893,21 @@ final class LogicalDisplay {
         }
         int displayRectTop = (physHeight - displayRectHeight) / 2;
         int displayRectLeft = (physWidth - displayRectWidth) / 2;
+        if (displayDeviceInfo.type == Display.TYPE_INTERNAL && mOneHandedScale < 0.999f) {
+            final float clampedScale = Math.max(0.40f, Math.min(1.0f, mOneHandedScale));
+            displayRectWidth = Math.max(1, Math.round(displayRectWidth * clampedScale));
+            displayRectHeight = Math.max(1, Math.round(displayRectHeight * clampedScale));
+            if (mOneHandedGravity == ONE_HANDED_GRAVITY_BOTTOM_LEFT) {
+                displayRectLeft = 0;
+                displayRectTop = physHeight - displayRectHeight;
+            } else if (mOneHandedGravity == ONE_HANDED_GRAVITY_CENTER) {
+                displayRectLeft = (physWidth - displayRectWidth) / 2;
+                displayRectTop = (physHeight - displayRectHeight) / 2;
+            } else {
+                displayRectLeft = physWidth - displayRectWidth;
+                displayRectTop = physHeight - displayRectHeight;
+            }
+        }
         mTempDisplayRect.set(displayRectLeft, displayRectTop,
                 displayRectLeft + displayRectWidth, displayRectTop + displayRectHeight);
 
@@ -997,6 +1020,19 @@ final class LogicalDisplay {
     public void setDisplayOffsetsLocked(int x, int y) {
         mDisplayOffsetX = x;
         mDisplayOffsetY = y;
+    }
+
+    public float getOneHandedScaleLocked() {
+        return mOneHandedScale;
+    }
+
+    public int getOneHandedGravityLocked() {
+        return mOneHandedGravity;
+    }
+
+    public void setOneHandedViewportLocked(float scale, int gravity) {
+        mOneHandedScale = scale;
+        mOneHandedGravity = gravity;
     }
 
     /**
@@ -1284,6 +1320,8 @@ final class LogicalDisplay {
         pw.println("mDesiredDisplayModeSpecs={" + mDesiredDisplayModeSpecs + "}");
         pw.println("mRequestedColorMode=" + mRequestedColorMode);
         pw.println("mDisplayOffset=(" + mDisplayOffsetX + ", " + mDisplayOffsetY + ")");
+        pw.println("mOneHandedViewport=(scale=" + mOneHandedScale
+                + ", gravity=" + mOneHandedGravity + ")");
         pw.println("mDisplayScalingDisabled=" + mDisplayScalingDisabled);
         pw.println("mBaseDisplayInfo=" + mBaseDisplayInfo);
         pw.println("mOverrideDisplayInfo=" + mOverrideDisplayInfo);

@@ -3364,6 +3364,46 @@ public final class DisplayManagerService extends SystemService {
         }
     }
 
+    void setOneHandedViewportInternal(int displayId, float scale, int gravity) {
+        if (Float.isNaN(scale) || Float.isInfinite(scale)) {
+            throw new IllegalArgumentException("Invalid one-handed scale: " + scale);
+        }
+        final float normalizedScale = (scale >= 0.999f) ? 1.0f : Math.max(0.40f, scale);
+        final int normalizedGravity =
+                (gravity == LogicalDisplay.ONE_HANDED_GRAVITY_BOTTOM_LEFT
+                        || gravity == LogicalDisplay.ONE_HANDED_GRAVITY_CENTER)
+                        ? gravity
+                        : LogicalDisplay.ONE_HANDED_GRAVITY_BOTTOM_RIGHT;
+        synchronized (mSyncRoot) {
+            final LogicalDisplay display = mLogicalDisplayMapper.getDisplayLocked(displayId);
+            if (display == null) {
+                return;
+            }
+            if (Math.abs(display.getOneHandedScaleLocked() - normalizedScale) > 0.0005f
+                    || display.getOneHandedGravityLocked() != normalizedGravity) {
+                Slog.i(TAG, "Display " + displayId + " one-handed viewport set to scale="
+                        + normalizedScale + " gravity=" + normalizedGravity);
+                display.setOneHandedViewportLocked(normalizedScale, normalizedGravity);
+                scheduleTraversalLocked(false);
+            }
+        }
+    }
+
+    float getOneHandedViewportScaleInternal(int displayId) {
+        synchronized (mSyncRoot) {
+            final LogicalDisplay display = mLogicalDisplayMapper.getDisplayLocked(displayId);
+            return display != null ? display.getOneHandedScaleLocked() : 1.0f;
+        }
+    }
+
+    int getOneHandedViewportGravityInternal(int displayId) {
+        synchronized (mSyncRoot) {
+            final LogicalDisplay display = mLogicalDisplayMapper.getDisplayLocked(displayId);
+            return display != null ? display.getOneHandedGravityLocked()
+                    : LogicalDisplay.ONE_HANDED_GRAVITY_BOTTOM_RIGHT;
+        }
+    }
+
     private void setDisplayScalingDisabledInternal(int displayId, boolean disable) {
         synchronized (mSyncRoot) {
             final LogicalDisplay display = mLogicalDisplayMapper.getDisplayLocked(displayId);
@@ -5837,6 +5877,38 @@ public final class DisplayManagerService extends SystemService {
             setDisplayTopology_enforcePermission();
             if (mDisplayTopologyCoordinator != null) {
                 mDisplayTopologyCoordinator.setTopology(topology);
+            }
+        }
+
+        @EnforcePermission(android.Manifest.permission.WRITE_SECURE_SETTINGS)
+        @Override // Binder call
+        public void setOneHandedViewport(int displayId, float scale, int gravity) {
+            setOneHandedViewport_enforcePermission();
+            final long token = Binder.clearCallingIdentity();
+            try {
+                setOneHandedViewportInternal(displayId, scale, gravity);
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
+        }
+
+        @Override // Binder call
+        public float getOneHandedViewportScale(int displayId) {
+            final long token = Binder.clearCallingIdentity();
+            try {
+                return getOneHandedViewportScaleInternal(displayId);
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
+        }
+
+        @Override // Binder call
+        public int getOneHandedViewportGravity(int displayId) {
+            final long token = Binder.clearCallingIdentity();
+            try {
+                return getOneHandedViewportGravityInternal(displayId);
+            } finally {
+                Binder.restoreCallingIdentity(token);
             }
         }
     }
