@@ -16,6 +16,7 @@
 
 package com.android.systemui.qs.tiles.impl.location.domain.interactor
 
+import android.os.SystemProperties
 import android.os.UserHandle
 import com.android.systemui.qs.tiles.base.domain.interactor.QSTileDataInteractor
 import com.android.systemui.qs.tiles.base.domain.model.DataUpdateTrigger
@@ -39,5 +40,6 @@ constructor(private val locationController: LocationController) :
     ): Flow<LocationTileModel> =
         locationController.isLocationEnabledFlow().map { LocationTileModel(it) }
 
-    override fun availability(user: UserHandle): Flow<Boolean> = flowOf(true)
+    override fun availability(user: UserHandle): Flow<Boolean> =
+        flowOf(!SystemProperties.getBoolean("ro.vaultos.gps.hardware_disabled", false))
 }

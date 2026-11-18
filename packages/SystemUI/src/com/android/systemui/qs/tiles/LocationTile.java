@@ -19,6 +19,7 @@ package com.android.systemui.qs.tiles;
 import android.content.Intent;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemProperties;
 import android.os.UserManager;
 import android.provider.Settings;
 import android.service.quicksettings.Tile;
@@ -79,6 +80,11 @@ public class LocationTile extends QSTileImpl<BooleanState> {
         mPanelInteractor = panelInteractor;
         mController.observe(this, mCallback);
         mKeyguard.observe(this, mCallback);
+    }
+
+    @Override
+    public boolean isAvailable() {
+        return !SystemProperties.getBoolean("ro.vaultos.gps.hardware_disabled", false);
     }
 
     @Override
